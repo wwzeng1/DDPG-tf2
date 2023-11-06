@@ -16,74 +16,82 @@ from src.buffer import ReplayBuffer
 from src.utils import OUActionNoise
 
 
-def ActorNetwork(num_states=24, num_actions=4, action_high=1):
-    """
-    Get Actor Network with the given parameters.
 
-    Args:
-        num_states: number of states in the NN
-        num_actions: number of actions in the NN
-        action_high: the top value of the action
+def load_model_weights():
+    def ActorNetwork(num_states=24, num_actions=4, action_high=1):
+        """
+        Get Actor Network with the given parameters.
 
-    Returns:
-        the Keras Model
-    """
-    # Initialize weights between -3e-3 and 3-e3
-    last_init = tf.random_normal_initializer(stddev=0.0005)
+        Args:
+            num_states: number of states in the NN
+            num_actions: number of actions in the NN
+            action_high: the top value of the action
 
-    inputs = tf.keras.layers.Input(shape=(num_states,), dtype=tf.float32)
-    out = tf.keras.layers.Dense(600, activation=tf.nn.leaky_relu,
-                                kernel_initializer=KERNEL_INITIALIZER)(inputs)
-    out = tf.keras.layers.Dense(300, activation=tf.nn.leaky_relu,
-                                kernel_initializer=KERNEL_INITIALIZER)(out)
-    outputs = tf.keras.layers.Dense(num_actions, activation="tanh", kernel_initializer=last_init)(
-        out) * action_high
+        Returns:
+            the Keras Model
+        """
+        # Initialize weights between -3e-3 and 3-e3
+        last_init = tf.random_normal_initializer(stddev=0.0005)
 
-    model = tf.keras.Model(inputs, outputs)
-    return model
+        inputs = tf.keras.layers.Input(shape=(num_states,), dtype=tf.float32)
+        out = tf.keras.layers.Dense(600, activation=tf.nn.leaky_relu,
+                                    kernel_initializer=KERNEL_INITIALIZER)(inputs)
+        out = tf.keras.layers.Dense(300, activation=tf.nn.leaky_relu,
+                                    kernel_initializer=KERNEL_INITIALIZER)(out)
+        outputs = tf.keras.layers.Dense(num_actions, activation="tanh", kernel_initializer=last_init)(
+            out) * action_high
+
+        model = tf.keras.Model(inputs, outputs)
+        return model
+
+load_model_weights()
 
 
-def CriticNetwork(num_states=24, num_actions=4, action_high=1):
-    """
-    Get Critic Network with the given parameters.
 
-    Args:
-        num_states: number of states in the NN
-        num_actions: number of actions in the NN
-        action_high: the top value of the action
+def save_model_weights():
+    def CriticNetwork(num_states=24, num_actions=4, action_high=1):
+        """
+        Get Critic Network with the given parameters.
 
-    Returns:
-        the Keras Model
-    """
-    last_init = tf.random_normal_initializer(stddev=0.00005)
+        Args:
+            num_states: number of states in the NN
+            num_actions: number of actions in the NN
+            action_high: the top value of the action
 
-    # State as input
-    state_input = tf.keras.layers.Input(shape=(num_states), dtype=tf.float32)
-    state_out = tf.keras.layers.Dense(600, activation=tf.nn.leaky_relu,
-                                      kernel_initializer=KERNEL_INITIALIZER)(state_input)
-    state_out = tf.keras.layers.BatchNormalization()(state_out)
-    state_out = tf.keras.layers.Dense(300, activation=tf.nn.leaky_relu,
-                                      kernel_initializer=KERNEL_INITIALIZER)(state_out)
+        Returns:
+            the Keras Model
+        """
+        last_init = tf.random_normal_initializer(stddev=0.00005)
 
-    # Action as input
-    action_input = tf.keras.layers.Input(shape=(num_actions), dtype=tf.float32)
-    action_out = tf.keras.layers.Dense(300, activation=tf.nn.leaky_relu,
-                                       kernel_initializer=KERNEL_INITIALIZER)(
-        action_input / action_high)
+        # State as input
+        state_input = tf.keras.layers.Input(shape=(num_states), dtype=tf.float32)
+        state_out = tf.keras.layers.Dense(600, activation=tf.nn.leaky_relu,
+                                          kernel_initializer=KERNEL_INITIALIZER)(state_input)
+        state_out = tf.keras.layers.BatchNormalization()(state_out)
+        state_out = tf.keras.layers.Dense(300, activation=tf.nn.leaky_relu,
+                                          kernel_initializer=KERNEL_INITIALIZER)(state_out)
 
-    # Both are passed through seperate layer before concatenating
-    added = tf.keras.layers.Add()([state_out, action_out])
+        # Action as input
+        action_input = tf.keras.layers.Input(shape=(num_actions), dtype=tf.float32)
+        action_out = tf.keras.layers.Dense(300, activation=tf.nn.leaky_relu,
+                                           kernel_initializer=KERNEL_INITIALIZER)(
+            action_input / action_high)
 
-    added = tf.keras.layers.BatchNormalization()(added)
-    outs = tf.keras.layers.Dense(150, activation=tf.nn.leaky_relu,
-                                 kernel_initializer=KERNEL_INITIALIZER)(added)
-    outs = tf.keras.layers.BatchNormalization()(outs)
-    outputs = tf.keras.layers.Dense(1, kernel_initializer=last_init)(outs)
+        # Both are passed through seperate layer before concatenating
+        added = tf.keras.layers.Add()([state_out, action_out])
 
-    # Outputs single value for give state-action
-    model = tf.keras.Model([state_input, action_input], outputs)
+        added = tf.keras.layers.BatchNormalization()(added)
+        outs = tf.keras.layers.Dense(150, activation=tf.nn.leaky_relu,
+                                     kernel_initializer=KERNEL_INITIALIZER)(added)
+        outs = tf.keras.layers.BatchNormalization()(outs)
+        outputs = tf.keras.layers.Dense(1, kernel_initializer=last_init)(outs)
 
-    return model
+        # Outputs single value for give state-action
+        model = tf.keras.Model([state_input, action_input], outputs)
+
+        return model
+
+save_model_weights()
 
 
 class Brain:  # pylint: disable=too-many-instance-attributes
@@ -231,6 +239,102 @@ class Brain:  # pylint: disable=too-many-instance-attributes
         self.critic_target.save_weights(path + "ct.h5")
         self.actor_target.save_weights(path + "at.h5")
 
+    def load_weights(self, path):
+        """
+        Load weights from path
+        """
+        try:
+            self.actor_network.load_weights(path + "an.h5")
+            self.critic_network.load_weights(path + "cn.h5")
+            self.critic_target.load_weights(path + "ct.h5")
+            self.actor_target.load_weights(path + "at.h5")
+        except OSError as err:
+            logging.warning("Weights files cannot be found, %s", err)
+
+def update_networks():
+    @staticmethod
+    def _update_target(model_target, model_ref, rho=0):
+        """
+        Update target's weights with the given model reference
+
+        Args:
+            model_target: the target model to be changed
+            model_ref: the reference model
+            rho: the ratio of the new and old weights
+        """
+        model_target.set_weights(
+            [
+                rho * ref_weight + (1 - rho) * target_weight
+                for (target_weight, ref_weight)
+                in list(zip(model_target.get_weights(), model_ref.get_weights()))
+            ]
+        )
+
+def store_to_buffer():
+    def act(self, state, _notrandom=True, noise=True):
+        """
+        Run action by the actor network
+
+        Args:
+            state: the current state
+            _notrandom: whether greedy is used
+            noise: whether noise is to be added to the result action (this improves exploration)
+
+        Returns:
+            the resulting action
+        """
+        if _notrandom:
+            self.cur_action = self.actor_network(state)[0].numpy()
+        else:
+            self.cur_action = (
+                np.random.uniform(self.action_low, self.action_high, self.num_actions)
+                + (self.noise() if noise else 0)
+            )
+
+        self.cur_action = np.clip(self.cur_action, self.action_low, self.action_high)
+        return self.cur_action
+
+def run_action():
+    def remember(self, prev_state, reward, state, done):
+        """
+        Store states, reward, done value to the buffer
+        """
+        # record it in the buffer based on its reward
+        self.buffer.append(prev_state, self.cur_action, reward, state, done)
+
+def update_target_weights():
+    def learn(self, entry):
+        """
+        Run update for all networks (for training)
+        """
+        s, a, r, sn, d = zip(*entry)
+
+        c_l, a_l = self.update_weights(tf.convert_to_tensor(s, dtype=tf.float32),
+                                       tf.convert_to_tensor(a, dtype=tf.float32),
+                                       tf.convert_to_tensor(r, dtype=tf.float32),
+                                       tf.convert_to_tensor(sn, dtype=tf.float32),
+                                       tf.convert_to_tensor(d, dtype=tf.float32))
+
+        self._update_target(self.actor_target, self.actor_network, self.rho)
+        self._update_target(self.critic_target, self.critic_network, self.rho)
+
+        return c_l, a_l
+
+def create_critic_network():
+    def save_weights(self, path):
+        """
+        Save weights to `path`
+        """
+        parent_dir = os.path.dirname(path)
+        if not os.path.exists(parent_dir):
+            os.makedirs(parent_dir)
+        # Save the weights
+        self.actor_network.save_weights(path + "an.h5")
+        self.critic_network.save_weights(path + "cn.h5")
+        self.critic_target.save_weights(path + "ct.h5")
+        self.actor_target.save_weights(path + "at.h5")
+
+def create_actor_network():
     def load_weights(self, path):
         """
         Load weights from path
